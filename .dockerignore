@@ -1,0 +1,16 @@
+build
+out
+.git
+.vs
+.vscode
+CMakeFiles
+CMakeCache.txt
+cmake-build-*
+Testing
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.pdb
+*.log
