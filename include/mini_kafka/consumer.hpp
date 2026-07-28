@@ -13,12 +13,18 @@ namespace mini_kafka {
 class Logger;
 class Metrics;
 class Topic;
+class ThreadPool;
 
 class Consumer {
 public:
     using Handler = std::function<void(const Message&)>;
 
-    Consumer(std::string id, std::shared_ptr<Topic> topic, Metrics& metrics, Logger& logger, Handler handler = {});
+    Consumer(std::string id,
+             std::shared_ptr<Topic> topic,
+             Metrics& metrics,
+             Logger& logger,
+             Handler handler = {},
+             ThreadPool* thread_pool = nullptr);
     ~Consumer();
 
     Consumer(const Consumer&) = delete;
@@ -38,6 +44,7 @@ private:
     Metrics* metrics_{nullptr};
     Logger* logger_{nullptr};
     Handler handler_;
+    ThreadPool* thread_pool_{nullptr};
     std::thread worker_;
     std::atomic<std::size_t> processed_count_{0};
 };

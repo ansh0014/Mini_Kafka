@@ -3,6 +3,7 @@
 #include "mini_kafka/logger.hpp"
 #include "mini_kafka/metrics.hpp"
 #include "mini_kafka/topic.hpp"
+#include "mini_kafka/thread_pool.hpp"
 
 #include <chrono>
 #include <stdexcept>
@@ -14,8 +15,14 @@ Consumer::Consumer(std::string id,
                    std::shared_ptr<Topic> topic,
                    Metrics& metrics,
                    Logger& logger,
-                   Handler handler)
-    : id_(std::move(id)), topic_(std::move(topic)), metrics_(&metrics), logger_(&logger), handler_(std::move(handler)) {
+                   Handler handler,
+                   ThreadPool* thread_pool)
+    : id_(std::move(id)),
+      topic_(std::move(topic)),
+      metrics_(&metrics),
+      logger_(&logger),
+      handler_(std::move(handler)),
+      thread_pool_(thread_pool) {
     if (id_.empty()) {
         throw std::invalid_argument("consumer id cannot be empty");
     }
@@ -62,12 +69,27 @@ void Consumer::run() {
     while (topic_->wait_consume(message)) {
         try {
             if (handler_) {
-                handler_(message);
+                if (thread_pool_) {
+                    // Dispatch execution asynchronously to ThreadPool
+                    thread_pool_->submit([this, msg = std::move(message)]() {
+                        try {
+                            handler_(msg);
+                            processed_count_.fetch_add(1, std::memory_order_relaxed);
+                            metrics_->record_consumed();
+                            logger_->debug("consumer " + id_ + " processed message (async) " + std::to_string(msg.sequence));
+                        } catch (const std::exception& exception) {
+                            metrics_->record_error();
+                            logger_->error("consumer " + id_ + " async processing failed: " + exception.what());
+                        }
+                    });
+                } else {
+                    // Sync processing on this consumer's dedicated thread
+                    handler_(message);
+                    processed_count_.fetch_add(1, std::memory_order_relaxed);
+                    metrics_->record_consumed();
+                    logger_->debug("consumer " + id_ + " processed message (sync) " + std::to_string(message.sequence));
+                }
             }
-
-            processed_count_.fetch_add(1, std::memory_order_relaxed);
-            metrics_->record_consumed();
-            logger_->debug("consumer " + id_ + " processed message " + std::to_string(message.sequence));
         } catch (const std::exception& exception) {
             metrics_->record_error();
             logger_->error("consumer " + id_ + " failed: " + exception.what());
