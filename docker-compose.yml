@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  broker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mini_kafka_broker
+    restart: on-failure
+
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mini_kafka_benchmark
+    entrypoint: ["/usr/local/bin/mini_kafka_benchmark"]
+    command: ["4", "4", "50000", "10000", "4"]
