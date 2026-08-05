@@ -33,4 +33,4 @@ std::size_t Topic::size() const {
     return queue_.size();
 }
 
-}  // namespace mini_kafka
+}

@@ -49,4 +49,4 @@ private:
     std::atomic<std::size_t> processed_count_{0};
 };
 
-}  // namespace mini_kafka
+}

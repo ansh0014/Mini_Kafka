@@ -6,8 +6,8 @@
 
 namespace mini_kafka {
 
-Broker::Broker(std::ostream& log_stream)
-    : logger_(log_stream) {}
+Broker::Broker(std::ostream& log_stream, std::size_t thread_pool_size)
+    : logger_(log_stream), thread_pool_(thread_pool_size) {}
 
 Broker::~Broker() {
     shutdown();
@@ -51,9 +51,11 @@ Producer& Broker::launch_producer(std::string id,
 
 Consumer& Broker::launch_consumer(std::string id,
                                   const std::string& topic_name,
-                                  Consumer::Handler handler) {
+                                  Consumer::Handler handler,
+                                  bool use_thread_pool) {
     auto target = topic_locked(topic_name);
-    auto consumer = std::make_unique<Consumer>(std::move(id), std::move(target), metrics_, logger_, std::move(handler));
+    ThreadPool* pool = use_thread_pool ? &thread_pool_ : nullptr;
+    auto consumer = std::make_unique<Consumer>(std::move(id), std::move(target), metrics_, logger_, std::move(handler), pool);
     Consumer& reference = *consumer;
     consumer->start();
 
@@ -88,6 +90,14 @@ void Broker::shutdown() {
     wait_for_producers();
     close_all_topics();
     wait_for_consumers();
+    thread_pool_.shutdown();
+
+    std::vector<std::unique_ptr<Consumer>> consumers_to_destroy;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        consumers_to_destroy.swap(consumers_);
+    }
+
     stop_health_monitor();
 }
 
@@ -107,17 +117,20 @@ void Broker::wait_for_producers() {
 }
 
 void Broker::wait_for_consumers() {
-    std::vector<std::unique_ptr<Consumer>> consumers;
+    std::vector<Consumer*> consumers_to_join;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        consumers.swap(consumers_);
+        consumers_to_join.reserve(consumers_.size());
+        for (auto& consumer : consumers_) {
+            if (consumer) {
+                consumers_to_join.push_back(consumer.get());
+            }
+        }
     }
 
-    for (auto& consumer : consumers) {
-        if (consumer) {
-            consumer->join();
-        }
+    for (auto* consumer : consumers_to_join) {
+        consumer->join();
     }
 }
 
@@ -143,6 +156,10 @@ Logger& Broker::logger() {
 
 Metrics& Broker::metrics_store() {
     return metrics_;
+}
+
+ThreadPool& Broker::thread_pool() {
+    return thread_pool_;
 }
 
 TopicPtr Broker::topic_locked(const std::string& name) const {
@@ -173,4 +190,4 @@ void Broker::close_all_topics() {
     }
 }
 
-}  // namespace mini_kafka
+}

@@ -6,6 +6,7 @@
 #include "mini_kafka/metrics.hpp"
 #include "mini_kafka/producer.hpp"
 #include "mini_kafka/topic.hpp"
+#include "mini_kafka/thread_pool.hpp"
 
 #include <chrono>
 #include <cstddef>
@@ -20,7 +21,7 @@ namespace mini_kafka {
 
 class Broker {
 public:
-    explicit Broker(std::ostream& log_stream = std::clog);
+    explicit Broker(std::ostream& log_stream = std::clog, std::size_t thread_pool_size = 4);
     ~Broker();
 
     Broker(const Broker&) = delete;
@@ -30,13 +31,14 @@ public:
     TopicPtr topic(const std::string& name) const;
 
     Producer& launch_producer(std::string id,
-                              const std::string& topic_name,
-                              std::size_t message_count,
-                              std::chrono::milliseconds interval);
+                               const std::string& topic_name,
+                               std::size_t message_count,
+                               std::chrono::milliseconds interval);
 
     Consumer& launch_consumer(std::string id,
                               const std::string& topic_name,
-                              Consumer::Handler handler = {});
+                              Consumer::Handler handler = {},
+                              bool use_thread_pool = true);
 
     void launch_health_monitor(const std::string& topic_name,
                                std::chrono::milliseconds interval = std::chrono::milliseconds{500});
@@ -52,6 +54,7 @@ public:
 
     Logger& logger();
     Metrics& metrics_store();
+    ThreadPool& thread_pool();
 
 private:
     TopicPtr topic_locked(const std::string& name) const;
@@ -64,6 +67,7 @@ private:
     std::unique_ptr<HealthMonitor> monitor_;
     Metrics metrics_;
     Logger logger_;
+    ThreadPool thread_pool_;
 };
 
-}  // namespace mini_kafka
+}

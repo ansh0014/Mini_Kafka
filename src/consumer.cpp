@@ -70,24 +70,22 @@ void Consumer::run() {
         try {
             if (handler_) {
                 if (thread_pool_) {
-                    // Dispatch execution asynchronously to ThreadPool
                     thread_pool_->submit([this, msg = std::move(message)]() {
                         try {
                             handler_(msg);
                             processed_count_.fetch_add(1, std::memory_order_relaxed);
                             metrics_->record_consumed();
-                            logger_->debug("consumer " + id_ + " processed message (async) " + std::to_string(msg.sequence));
+                            logger_->debug("consumer " + id_ + " processed message " + std::to_string(msg.sequence));
                         } catch (const std::exception& exception) {
                             metrics_->record_error();
-                            logger_->error("consumer " + id_ + " async processing failed: " + exception.what());
+                            logger_->error("consumer " + id_ + " processing failed: " + exception.what());
                         }
                     });
                 } else {
-                    // Sync processing on this consumer's dedicated thread
                     handler_(message);
                     processed_count_.fetch_add(1, std::memory_order_relaxed);
                     metrics_->record_consumed();
-                    logger_->debug("consumer " + id_ + " processed message (sync) " + std::to_string(message.sequence));
+                    logger_->debug("consumer " + id_ + " processed message " + std::to_string(message.sequence));
                 }
             }
         } catch (const std::exception& exception) {
@@ -100,4 +98,4 @@ void Consumer::run() {
     logger_->info("consumer " + id_ + " stopped");
 }
 
-}  // namespace mini_kafka
+}

@@ -84,4 +84,4 @@ std::string Logger::level_to_string(Level level) {
     return "INFO";
 }
 
-}  // namespace mini_kafka
+}

@@ -16,6 +16,7 @@ add_library(mini_kafka
     src/main.cpp
     src/producer.cpp
     src/topic.cpp
+    src/thread_pool.cpp
 )
 
 target_include_directories(mini_kafka
@@ -60,3 +61,12 @@ target_link_libraries(test_pipeline
 )
 
 add_test(NAME pipeline COMMAND test_pipeline)
+
+add_executable(mini_kafka_benchmark
+    benchmark/benchmark.cpp
+)
+
+target_link_libraries(mini_kafka_benchmark
+    PRIVATE
+        mini_kafka
+)

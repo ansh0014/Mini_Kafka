@@ -74,4 +74,4 @@ void Producer::run(std::size_t message_count, std::chrono::milliseconds interval
     logger_->info("producer " + id_ + " finished");
 }
 
-}  // namespace mini_kafka
+}
